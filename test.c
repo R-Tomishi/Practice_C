@@ -5,16 +5,19 @@
 
 typedef char String[1024];
 
-void hello(void)
+void funcB(void)
 {
-	printf("こんにちは\n");
+	printf("関数Bです\n");
+}
+
+void funcA(void)
+{
+	printf("関数Aです\n");
+	funcB();
 }
 
 int main(void)
 {
-	printf("関数を呼び出します\n");
-	hello();
-	printf("関数の呼び出しが終わりました\n");
-
+	funcA();
 	return 0;
 }
