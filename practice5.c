@@ -9,7 +9,7 @@ int main(void)
 {
 	int a = 70;
 	printf("変数aには%dが入っています\n", a);
-	void* addrA = (void*)&a;
-	printf("変数aのアドレス:%p\n", addrA);
+	long addrA = (long)&a;
+	printf("変数aのアドレス:%ld\n", addrA);
 	return 0;
 }
