@@ -5,9 +5,13 @@
 
 typedef char String[1024];
 
-void funcB(void)
+void funcA(void);
+void funcB(void);
+
+int main(void)
 {
-	printf("関数Bです\n");
+	funcA();
+	return 0;
 }
 
 void funcA(void)
@@ -16,8 +20,7 @@ void funcA(void)
 	funcB();
 }
 
-int main(void)
+void funcB(void)
 {
-	funcA();
-	return 0;
+	printf("関数Bです\n");
 }
