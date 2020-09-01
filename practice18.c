@@ -8,9 +8,13 @@ typedef char String[1024];
 
 int main(void)
 {
-	char str[1024] = "hello";
-	char* p = str;
-	printf("%s, %s\n", str, p);
-	printf("%p\n", p);
+	char ages[1024] = {19, 21, 29, 29};
+	String str = "hello";
+	printf("%s\n", str);
+
+	for (int i = 0; i < 10; i++){
+		printf("%d, ", str[i]);
+	}
+
 	return 0;
 }
