@@ -5,15 +5,54 @@
 #include <stdbool.h>
 
 /*** 列挙型宣言 ***/
+enum {FIRE, WATER, WIND, EARTH, LIFE, EMPTY};
+
 /*** グローバル定数の宣言 ***/
+const char ELEMENT_SYMBOLS[] = {'$', '~', '@', '#', '&', ' '};
+const int ELEMENT_COLORS[] = {1, 6, 2, 3, 5, 0};
+
 /*** 構造体型宣言 ***/
+typedef struct {
+  char name[30];
+  int hp;
+  int hpMax;
+  int element;
+  int attack;
+  int defense;
+} Monster;
+
+Monster monsterList[] = {
+  {"スライム", 100, 100, 1, 10, 5},
+  {"ゴブリン", 200, 200, 3, 20, 15},
+  {"オオコウモリ", 300, 300, 2, 30, 25},
+  {"ウェアウルフ", 400, 400, 2, 40, 30},
+  {"ドラゴン", 800, 800, 0, 50, 40},
+};
+
+typedef struct {
+  Monster* monsterAddr;
+  int monsterCnt;
+} Dungeon;
+
+Dungeon dungeonList[] = {
+  {&monsterList[0], sizeof(monsterList) / sizeof(Monster)}
+};
+
 /*** プロトタイプ宣言 ***/
 /*** 関数宣言 ***/
 
-bool doBattle(char* enemy)
+// モンスターに色をつける関数
+void printMonsterName(Monster* m)
 {
-  printf("%sが現れた!\n", enemy);
-  printf("%sを倒した!\n", enemy);
+  printf("\x1b[3%dm%c%s%c\x1b[39m", ELEMENT_COLORS[m->element], ELEMENT_SYMBOLS[m->element], m->name, ELEMENT_SYMBOLS[m->element]);
+}
+
+bool doBattle(Monster* mAddr)
+{
+  printMonsterName(mAddr);
+  printf("が現れた!\n");
+  printMonsterName(mAddr);
+  printf("を倒した!\n");
   return true;
 }
 
@@ -22,11 +61,13 @@ void goDungeon(char* playerName)
   printf("%sはダンジョンに到着した\n", playerName);
 
   //　敵モンスターとのバトル
-  doBattle("スライム");
-  doBattle("ゴブリン");
-  doBattle("オオコウモリ");
-  doBattle("ウェアウルフ");
-  doBattle("ドラゴン");
+  for (int i = 0; i < dungeonList[0].monsterCnt; i++) {
+    doBattle(&monsterList[0]+i);
+  }
+  // doBattle(&m2);
+  // doBattle(&m3);
+  // doBattle(&m4);
+  // doBattle(&m5);
 
   printf("%sはダンジョンを制覇した\n", playerName);
   printf("***GAME CLEARED***\n");
