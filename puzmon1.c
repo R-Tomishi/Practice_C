@@ -56,42 +56,91 @@ void printMonsterName(Monster* m)
   printf("\x1b[3%dm%c%s%c\x1b[39m", ELEMENT_COLORS[m->element], ELEMENT_SYMBOLS[m->element], m->name, ELEMENT_SYMBOLS[m->element]);
 }
 
+// プレイヤーの攻撃を管理する関数
+int doAttack(char* playerName, Monster* mAddr, int HP)
+{
+  int attack = 80;
+  printf("ダミーの攻撃で%dのダメージを与えた\n\n", attack);
+  return attack;
+}
+
+// プレイヤのターンを管理する関数
+int onPlayerTurn(char* playerName, Monster* mAddr, int HP)
+{
+    printf("[%sのターン]\n\n", playerName);
+    int attack = doAttack(playerName, mAddr, HP);
+    return attack;
+}
+
+// 敵の攻撃を管理する関数
+int doEnemyAttack(Monster* mAddr, int HP)
+{
+  int attack = 20;
+  printf("%dのダメージを受けた\n\n", attack);
+  return attack;
+}
+
+// 敵のターンを管理する関数
+int onEnemyTurn(Monster* mAddr, int HP)
+{
+    printf("[%sのターン]\n\n", mAddr->name);
+    int attack = doEnemyAttack(mAddr, HP);
+    return attack;
+}
+
 // モンスターとバトルする関数
-bool doBattle(Monster* mAddr, int HP)
+int doBattle(char* playerName, Monster* mAddr, int HP)
 {
   printMonsterName(mAddr);
-  printf("が現れた!\n");
-  printMonsterName(mAddr);
-  printf("を倒した!\n");
-  printf("HPは%d\n", HP);
-  if (HP > 0) {
-    return false;
-  } else {
-    return true;
+  printf("が現れた!\n\n");
+
+  int MonsterHP = mAddr->hp;
+
+  while (true) {
+    printf("パーティのHPは%d\n\n", HP);
+    printMonsterName(mAddr);
+    printf("のHPは%d\n\n", MonsterHP);
+
+    int Edamage = onPlayerTurn(playerName, mAddr, HP);
+    MonsterHP -= Edamage;
+    if (MonsterHP <= 0) {
+      printMonsterName(mAddr);
+      printf("を倒した\n\n");
+      break;
+    }
+
+    int Pdamage = onEnemyTurn(mAddr, HP);
+    HP -= Pdamage;
+    if (HP <= 0) {
+      break;
+    }
   }
+  return HP;
 }
+
 
 // ダンジョンで闘う関数
 void goDungeon(char* playerName, int HP)
 {
-  printf("%sはダンジョンに到着した\n", playerName);
+  printf("\n");
   int clear_cnt = 0;
   //　敵モンスターとのバトル
   for (int i = 0; i < dungeonList[0].monsterCnt; i++) {
-    bool GameOVER = doBattle(&monsterList[0]+i, HP);
+    int presentHP = doBattle(playerName, &monsterList[0]+i, HP);
+    HP = presentHP;
 
-    if (GameOVER) {
-      printf("%sはダンジョンから逃げ出した\n", playerName);
-      printf("***GAME OVER***\n");
+    if (presentHP <= 0) {
+      printf("%sはダンジョンから逃げ出した\n\n", playerName);
+      printf("***GAME OVER***\n\n");
       break;
     } else {
         clear_cnt += 1;
         if (i == (dungeonList[0].monsterCnt-1)) {
-          printf("%sはダンジョンを制覇した\n", playerName);
-          printf("***GAME CLEARED***\n");
+          printf("%sはダンジョンを制覇した\n\n", playerName);
+          printf("***GAME CLEARED***\n\n");
         } else {
-          printf("%sはさらに奥に進んだ\n", playerName);
-          printf("=================\n");
+          printf("%sはさらに奥に進んだ\n\n", playerName);
+          printf("=================\n\n");
         }
       }
     }
@@ -105,21 +154,20 @@ int organaizePaty(char* playerName, Monster* partyAddr, int partysize)
   for (int i = 0; i < partysize; i++) {
     sumHP += (partyAddr+i)->hp;
   }
-  printf("%sのパーティ(HP=%d)はダンジョンに到着した\n", playerName, sumHP);
+  printf("%sのパーティ(HP=%d)はダンジョンに到着した\n\n", playerName, sumHP);
   return sumHP;
 }
 
 // パーティ編成情報の一覧表示関数
 void showParty(Monster* partyAddr, int partysize)
 {
-  printf("<パーティ編成>----------\n");
+  printf("<パーティ編成>----------\n\n");
   for (int i = 0; i < partysize; i++) {
     printMonsterName(partyAddr+i);
     printf(" HP=%d 攻撃=%d 防御=%d\n", (partyAddr+i)->hp, (partyAddr+i)->attack, (partyAddr+i)->defense);
   }
-  printf("----------------------\n");
+  printf("----------------------\n\n");
 }
-
 
 int main(int argc, char** argv)
 {
@@ -127,7 +175,7 @@ int main(int argc, char** argv)
 	char* playerName = argv[argc-1];
   if (argc == 2){
     // printf("%s\n", playerName);
-    printf("*** Puzzle & Monsters ***\n");
+    printf("*** Puzzle & Monsters ***\n\n");
 
     // パーティ構成
     Monster* partyList[] = {&suzaku, &seiryu, &byakko, &genbu};
