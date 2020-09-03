@@ -3,15 +3,20 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 
 /*** 列挙型宣言 ***/
 enum {FIRE, WATER, WIND, EARTH, LIFE, EMPTY};
-
 /*** グローバル定数の宣言 ***/
 const char ELEMENT_SYMBOLS[] = {'$', '~', '@', '#', '&', ' '};
 const int ELEMENT_COLORS[] = {1, 6, 2, 3, 5, 0};
+const int MAX_GEMS = 14;
+const char alpha[MAX_GEMS+1] = {"ABCDEFGHIJKLMN"};
 
 int HP;
+int EneHP;
+int EneMaxHP;
 
 /*** 構造体型宣言 ***/
 typedef struct {
@@ -38,6 +43,9 @@ Monster monsterList[] = {
   {"ドラゴン", 800, 800, 0, 50, 40},
 };
 
+
+
+//ダンジョン構造体
 typedef struct {
   Monster* monsterAddr;
   int monsterCnt;
@@ -47,8 +55,17 @@ Dungeon dungeonList[] = {
   {&monsterList[0], sizeof(monsterList) / sizeof(Monster)}
 };
 
+typedef struct {
+  Monster* partyAddr;
+  int partyCnt;
+  Monster* monsterAddr;
+  int monsterCnt;
+  int* slot;
+} BattleField;
+
 /*** プロトタイプ宣言 ***/
 /*** 関数宣言 ***/
+void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field);
 
 // モンスターに色をつける関数
 void printMonsterName(Monster* m)
@@ -65,9 +82,11 @@ int doAttack(char* playerName, Monster* mAddr, int HP)
 }
 
 // プレイヤのターンを管理する関数
-int onPlayerTurn(char* playerName, Monster* mAddr, int HP)
+int onPlayerTurn(char* playerName, Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field)
 {
     printf("[%sのターン]\n\n", playerName);
+    showBattleField(mAddr, HP, EneHP, EneMaxHP, field);
+
     int attack = doAttack(playerName, mAddr, HP);
     return attack;
 }
@@ -89,21 +108,18 @@ int onEnemyTurn(Monster* mAddr, int HP)
 }
 
 // モンスターとバトルする関数
-int doBattle(char* playerName, Monster* mAddr, int HP)
+int doBattle(char* playerName, Monster* mAddr, int HP, BattleField field)
 {
   printMonsterName(mAddr);
   printf("が現れた!\n\n");
 
-  int MonsterHP = mAddr->hp;
+  int EneHP = mAddr->hp;
+  int EneMaxHP = mAddr->hp;
 
   while (true) {
-    printf("パーティのHPは%d\n\n", HP);
-    printMonsterName(mAddr);
-    printf("のHPは%d\n\n", MonsterHP);
-
-    int Edamage = onPlayerTurn(playerName, mAddr, HP);
-    MonsterHP -= Edamage;
-    if (MonsterHP <= 0) {
+    int Edamage = onPlayerTurn(playerName, mAddr, HP, EneHP, EneMaxHP, field);
+    EneHP -= Edamage;
+    if (EneHP <= 0) {
       printMonsterName(mAddr);
       printf("を倒した\n\n");
       break;
@@ -120,13 +136,13 @@ int doBattle(char* playerName, Monster* mAddr, int HP)
 
 
 // ダンジョンで闘う関数
-void goDungeon(char* playerName, int HP)
+void goDungeon(char* playerName, int HP, BattleField field)
 {
   printf("\n");
   int clear_cnt = 0;
   //　敵モンスターとのバトル
   for (int i = 0; i < dungeonList[0].monsterCnt; i++) {
-    int presentHP = doBattle(playerName, &monsterList[0]+i, HP);
+    int presentHP = doBattle(playerName, &monsterList[0]+i, HP, field);
     HP = presentHP;
 
     if (presentHP <= 0) {
@@ -161,7 +177,7 @@ int organaizePaty(char* playerName, Monster* partyAddr, int partysize)
 // パーティ編成情報の一覧表示関数
 void showParty(Monster* partyAddr, int partysize)
 {
-  printf("<パーティ編成>----------\n\n");
+  printf("<パーティ編成>---------\n");
   for (int i = 0; i < partysize; i++) {
     printMonsterName(partyAddr+i);
     printf(" HP=%d 攻撃=%d 防御=%d\n", (partyAddr+i)->hp, (partyAddr+i)->attack, (partyAddr+i)->defense);
@@ -169,9 +185,61 @@ void showParty(Monster* partyAddr, int partysize)
   printf("----------------------\n\n");
 }
 
+// 新しい宝石を生み出す関数
+int fillGems(void)
+{
+  return rand() % 5;
+}
+
+// 宝石を表示するための関数
+void printGem(int gem)
+{
+  printf("\x1b[4%dm%c\x1b[49m ", ELEMENT_COLORS[gem], ELEMENT_SYMBOLS[gem]);
+}
+
+// 宝石の並びを示す関数
+void printGems(int MAX_GEMS, BattleField field)
+{
+  for (int i = 0; i < MAX_GEMS; i++) {
+    printGem(*(field.slot+i));
+  }
+  printf("\n\n");
+}
+
+// バトルフィールドの状況を画面に表示する関数
+void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field)
+{
+  int MaxHP = 0;
+  for (int i = 0; i < field.partyCnt; i++) {
+    MaxHP += (field.partyAddr+i)->hp;
+  }
+
+  printf("------------------------------\n");
+  printf("          ");
+  printMonsterName(mAddr);
+  printf("          \n");
+  printf("        HP= %d / %d           \n\n\n\n", EneHP, EneMaxHP);
+  for (int i = 0; i < field.partyCnt; i++) {
+    printMonsterName(field.partyAddr+i);
+    printf(" ");
+  }
+  printf("\n");
+  printf("        HP= %d / %d           \n\n", HP, MaxHP);
+  printf("------------------------------\n\n");
+  for (int i = 0; i < MAX_GEMS; i++) {
+    printf("%c ", alpha[i]);
+  }
+  printf("\n");
+
+  printGems(MAX_GEMS, field);
+  printf("------------------------------\n");
+}
+
+
 int main(int argc, char** argv)
 {
-// 起動時の名前入力
+  srand((unsigned)time(0UL));
+  // 起動時の名前入力
 	char* playerName = argv[argc-1];
   if (argc == 2){
     // printf("%s\n", playerName);
@@ -179,11 +247,22 @@ int main(int argc, char** argv)
 
     // パーティ構成
     Monster* partyList[] = {&suzaku, &seiryu, &byakko, &genbu};
-    int HP = organaizePaty(playerName, partyList[0], sizeof(partyList) / sizeof(partyList[0]));
 
-    showParty(partyList[0], sizeof(partyList) / sizeof(partyList[0]));
+    int gems[MAX_GEMS];
+    for (int i = 0; i < MAX_GEMS; i++) {
+      gems[i] = fillGems();
+    }
+
+    // バトルフィールドの構造体をここで定義(パーティ編成が可変の可能性があるので)
+    BattleField field = {partyList[0], sizeof(partyList) / sizeof(partyList[0]),
+                         &monsterList[0], sizeof(monsterList) / sizeof(Monster),
+                         &gems[0]};
+
+    int HP = organaizePaty(playerName, field.partyAddr, field.partyCnt);
+
+    showParty(field.partyAddr, field.partyCnt);
     // ダンジョンの開始から終わり
-    goDungeon(playerName, HP);
+    goDungeon(playerName, HP, field);
 
   } else {
     printf("エラー:./a.outの後にスペースを入れてプレイヤー名を指定してください\n");
