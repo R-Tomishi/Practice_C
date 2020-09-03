@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 /*** 列挙型宣言 ***/
 enum {FIRE, WATER, WIND, EARTH, LIFE, EMPTY};
@@ -66,6 +67,8 @@ typedef struct {
 /*** プロトタイプ宣言 ***/
 /*** 関数宣言 ***/
 void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field);
+void checkValidCommand(void);
+void evaluateGems(BattleField field, char before, char after);
 
 // モンスターに色をつける関数
 void printMonsterName(Monster* m)
@@ -86,6 +89,19 @@ int onPlayerTurn(char* playerName, Monster* mAddr, int HP, int EneHP, int EneMax
 {
     printf("[%sのターン]\n\n", playerName);
     showBattleField(mAddr, HP, EneHP, EneMaxHP, field);
+
+    char cmd[10];
+    while(true){
+      printf("コマンド?>\n");
+      scanf("%s", cmd);
+      if (cmd[0] != cmd[1] && cmd[0] >= 65 && cmd[0] <= 78 && cmd[1] >= 65 && cmd[1] <= 78 && cmd[2] == 0)
+      {
+        break;
+      } else {
+        printf("コマンドエラー!もう一度入力してください\n");
+      }
+    }
+    evaluateGems(field, cmd[0], cmd[1]);
 
     int attack = doAttack(playerName, mAddr, HP);
     return attack;
@@ -203,7 +219,7 @@ void printGems(int MAX_GEMS, BattleField field)
   for (int i = 0; i < MAX_GEMS; i++) {
     printGem(*(field.slot+i));
   }
-  printf("\n\n");
+  printf("\n");
 }
 
 // バトルフィールドの状況を画面に表示する関数
@@ -232,9 +248,61 @@ void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleFiel
   printf("\n");
 
   printGems(MAX_GEMS, field);
+  printf("\n");
   printf("------------------------------\n");
 }
 
+//宝石の位置を入れ替える関数
+void swapGem(BattleField field, int before1, int before_ind, int after_ind)
+{
+  int preGems[MAX_GEMS];
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+
+  if ((after_ind-before_ind) > 0){
+    int before_val = preGems[before1];
+    int move_val = preGems[before1+1];
+    preGems[before1+1] = before_val;
+    preGems[before1] = move_val;
+  } else {
+    int before_val = preGems[before1];
+    int move_val = preGems[before1-1];
+    preGems[before1-1] = before_val;
+    preGems[before1] = move_val;
+  }
+  // for (int i = 0; i < MAX_GEMS; i++) {
+  //   printf("%d ", preGems[i]);
+  // }
+  memcpy(field.slot, &preGems[0], 100);
+  printGems(MAX_GEMS, field);
+}
+
+//宝石を移動させる関数
+void moveGem(BattleField field, int before_ind, int after_ind)
+{
+  if ((after_ind-before_ind) > 0){
+    for (int i = 0; i < (after_ind-before_ind); i++) {
+      swapGem(field, before_ind+i, before_ind, after_ind);
+      }
+    } else {
+        for (int i = 0; i > (after_ind-before_ind); i--) {
+          swapGem(field, before_ind+i, before_ind, after_ind);
+        }
+    }
+}
+
+// 宝石を移動して配列の並びを変更する関数
+void evaluateGems(BattleField field, char before, char after)
+{
+  int preGems[MAX_GEMS];
+  int before_ind = before - 65;
+  int after_ind = after -65;
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+  moveGem(field, before_ind, after_ind);
+}
 
 int main(int argc, char** argv)
 {
