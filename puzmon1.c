@@ -163,7 +163,7 @@ double doRecover(int gemCNT, BattleField field)
   int comboN = field.BaniInfo->combo;
   recover = blurDamage(preR);
   printf("%d COMBO!!\n", comboN);
-  printf("「命」宝石の消滅により%g回復\n", floor(recover*-1));
+  printf("「命」宝石の消滅により%g回復\n\n", floor(recover*-1));
   return floor(recover);
 }
 
