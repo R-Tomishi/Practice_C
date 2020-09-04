@@ -44,8 +44,6 @@ Monster monsterList[] = {
   {"ドラゴン", 800, 800, 0, 50, 40},
 };
 
-
-
 //ダンジョン構造体
 typedef struct {
   Monster* monsterAddr;
@@ -57,18 +55,26 @@ Dungeon dungeonList[] = {
 };
 
 typedef struct {
+  int element;
+  int stIndex;
+  int length;
+} BanishInfo;
+
+typedef struct {
   Monster* partyAddr;
   int partyCnt;
   Monster* monsterAddr;
   int monsterCnt;
   int* slot;
+  BanishInfo* BaniInfo;
 } BattleField;
 
 /*** プロトタイプ宣言 ***/
-/*** 関数宣言 ***/
 void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field);
 void checkValidCommand(void);
 void evaluateGems(BattleField field, char before, char after);
+
+/*** 関数宣言 ***/
 
 // モンスターに色をつける関数
 void printMonsterName(Monster* m)
@@ -292,6 +298,101 @@ void moveGem(BattleField field, int before_ind, int after_ind)
     }
 }
 
+// 消去した宝石のスロットにランダムの宝石を充填する
+void spawnGems(BattleField field)
+{
+  int preGems[MAX_GEMS];
+  int element = field.BaniInfo->element;
+  int start = field.BaniInfo->stIndex;
+  int length = field.BaniInfo->length;
+
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+
+  for (int i = 0; i < MAX_GEMS; i++) {
+    if (preGems[i] == 5) {
+      preGems[i] = rand() % 5;
+    }
+  }
+  memcpy(field.slot, &preGems[0], 100);
+  printGems(MAX_GEMS, field);
+}
+
+//宝石を左詰する関数
+void shiftGems(BattleField field)
+{
+  int preGems[MAX_GEMS];
+  int element = field.BaniInfo->element;
+  int start = field.BaniInfo->stIndex;
+  int length = field.BaniInfo->length;
+
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+  for (int j = 0; j < length + 1; j++) {
+    for (int i = 0; i < (MAX_GEMS-length-start); i++){
+      preGems[start+length+i-j] = preGems[start+length+i+1-j];
+    }
+    preGems[MAX_GEMS-1-j] = 5;
+    memcpy(field.slot, &preGems[0], 100);
+    printGems(MAX_GEMS, field);
+  }
+}
+
+//宝石を消去する関数
+void banishGems(BattleField field)
+{
+  int preGems[MAX_GEMS];
+  int element = field.BaniInfo->element;
+  int start = field.BaniInfo->stIndex;
+  int length = field.BaniInfo->length;
+
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+
+  for (int i = start; i <= (start + length); i++) {
+    preGems[i] = 5; //無属性を代入
+  }
+  memcpy(field.slot, &preGems[0], 100);
+  printGems(MAX_GEMS, field);
+}
+
+// 宝石の並びを調べて消去可能な箇所があることを判断する関数
+bool checkBanishable(BattleField field)
+{
+  int preGems[MAX_GEMS];
+  int element = 0;
+  int start = 0;
+  int length = 0;
+
+  for (int i = 0; i < MAX_GEMS; i++) {
+    preGems[i] = *(field.slot+i);
+  }
+
+  for (int i = 0; i < (MAX_GEMS-1); i++) {
+    element = preGems[i];
+    if (element == preGems[i+1]) {
+      length += 1;
+      start = i + 1 - length;
+    }
+    if (length <=1 && element != preGems[i+1]) {
+      length = 0;
+      start = 0;
+    }
+    if (length >= 2 && element != preGems[i+1]) {
+      break;
+    }
+  }
+  BanishInfo Info = {element, start, length};
+  memcpy(field.BaniInfo, &Info, 12);
+  if (length >= 2) {
+    return true;
+  }
+  return false;
+}
+
 // 宝石を移動して配列の並びを変更する関数
 void evaluateGems(BattleField field, char before, char after)
 {
@@ -301,7 +402,14 @@ void evaluateGems(BattleField field, char before, char after)
   for (int i = 0; i < MAX_GEMS; i++) {
     preGems[i] = *(field.slot+i);
   }
+
   moveGem(field, before_ind, after_ind);
+  bool banish = checkBanishable(field);
+  if (banish) {
+    banishGems(field);
+    shiftGems(field);
+    spawnGems(field);
+    }
 }
 
 int main(int argc, char** argv)
@@ -321,10 +429,12 @@ int main(int argc, char** argv)
       gems[i] = fillGems();
     }
 
+    BanishInfo BaniInfo = {5, 0, 0};
+
     // バトルフィールドの構造体をここで定義(パーティ編成が可変の可能性があるので)
     BattleField field = {partyList[0], sizeof(partyList) / sizeof(partyList[0]),
                          &monsterList[0], sizeof(monsterList) / sizeof(Monster),
-                         &gems[0]};
+                         &gems[0], &BaniInfo};
 
     int HP = organaizePaty(playerName, field.partyAddr, field.partyCnt);
 
