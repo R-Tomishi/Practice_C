@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 /*** 列挙型宣言 ***/
 enum {FIRE, WATER, WIND, EARTH, LIFE, EMPTY};
@@ -58,6 +59,7 @@ typedef struct {
   int element;
   int stIndex;
   int length;
+  int combo;
 } BanishInfo;
 
 typedef struct {
@@ -72,7 +74,7 @@ typedef struct {
 /*** プロトタイプ宣言 ***/
 void showBattleField(Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field);
 void checkValidCommand(void);
-void evaluateGems(BattleField field, char before, char after);
+void evaluateGems(BattleField field, char before, char after, int combo);
 
 /*** 関数宣言 ***/
 
@@ -82,50 +84,159 @@ void printMonsterName(Monster* m)
   printf("\x1b[3%dm%c%s%c\x1b[39m", ELEMENT_COLORS[m->element], ELEMENT_SYMBOLS[m->element], m->name, ELEMENT_SYMBOLS[m->element]);
 }
 
-// プレイヤーの攻撃を管理する関数
-int doAttack(char* playerName, Monster* mAddr, int HP)
+//攻撃,回復に対して±10%のばらつきを生成する関数
+double blurDamage(double val)
 {
-  int attack = 80;
-  printf("ダミーの攻撃で%dのダメージを与えた\n\n", attack);
-  return attack;
+  double blur = rand() % 21;
+  double out = (blur /100 + 0.9) * val;
+  return out;
+}
+
+//攻撃、10%補正前の値を算出する関数
+double calcAttackDamage(BattleField field, int element, int gemCNT, Monster* mAddr)
+{
+  // 属性の係数用
+  double ELEMENT_BOOST[4][4];
+  ELEMENT_BOOST[0][0] = 1.0;
+  ELEMENT_BOOST[0][1] = 0.5;
+  ELEMENT_BOOST[0][2] = 2.0;
+  ELEMENT_BOOST[0][3] = 1.0;
+  ELEMENT_BOOST[1][0] = 2.0;
+  ELEMENT_BOOST[1][1] = 1.0;
+  ELEMENT_BOOST[1][2] = 1.0;
+  ELEMENT_BOOST[1][3] = 0.5;
+  ELEMENT_BOOST[2][0] = 0.5;
+  ELEMENT_BOOST[2][1] = 1.0;
+  ELEMENT_BOOST[2][2] = 1.0;
+  ELEMENT_BOOST[2][3] = 2.0;
+  ELEMENT_BOOST[3][0] = 1.0;
+  ELEMENT_BOOST[3][1] = 2.0;
+  ELEMENT_BOOST[3][2] = 0.5;
+  ELEMENT_BOOST[3][3] = 1.0;
+
+  int partyIndex[4] = {0, 3, 1, 2};
+  double preAttack;
+  int pAttack = (field.partyAddr+partyIndex[element])->attack;
+  int eDefense = mAddr->defense;
+  int comboN = field.BaniInfo->combo;
+  preAttack = (pAttack - eDefense) * ELEMENT_BOOST[element][mAddr->element] * pow(1.5, (gemCNT-3+comboN));
+  return preAttack;
+}
+
+// プレイヤーの攻撃を管理する関数
+int doAttack(BattleField field, Monster* mAddr)
+{
+  double attack;
+  int element = field.BaniInfo->element;
+  int start = field.BaniInfo->stIndex;
+  int length = field.BaniInfo->length;
+  int gemCNT = length + 1;
+  int comboN = field.BaniInfo->combo;
+  int partyIndex[4] = {0, 3, 1, 2};
+  if (element <= 3) {
+    printf("%d COMBO!!\n", comboN);
+    printMonsterName(field.partyAddr+partyIndex[element]);
+    double preAttack = calcAttackDamage(field, element, gemCNT, mAddr);
+    attack = blurDamage(preAttack);
+    if (attack <= 0) {
+      attack = 1;
+    }
+    printf("の攻撃で%gのダメージを与えた\n\n", floor(attack));
+  }
+  return floor(attack);
+}
+
+// 回復を算出する関数
+double calcRecoverDamage(int gemCNT, BattleField field)
+{
+    double preRecover;
+    int comboN = field.BaniInfo->combo;
+    preRecover = -20 * pow(1.5, (gemCNT-3+comboN));
+    return preRecover;
+}
+
+// 回復を管理する関数
+double doRecover(int gemCNT, BattleField field)
+{
+  double recover;
+  double preR = calcRecoverDamage(gemCNT, field);
+  int comboN = field.BaniInfo->combo;
+  recover = blurDamage(preR);
+  printf("%d COMBO!!\n", comboN);
+  printf("「命」宝石の消滅により%g回復\n", floor(recover*-1));
+  return floor(recover);
 }
 
 // プレイヤのターンを管理する関数
 int onPlayerTurn(char* playerName, Monster* mAddr, int HP, int EneHP, int EneMaxHP, BattleField field)
 {
-    printf("[%sのターン]\n\n", playerName);
-    showBattleField(mAddr, HP, EneHP, EneMaxHP, field);
-
     char cmd[10];
-    while(true){
-      printf("コマンド?>\n");
-      scanf("%s", cmd);
-      if (cmd[0] != cmd[1] && cmd[0] >= 65 && cmd[0] <= 78 && cmd[1] >= 65 && cmd[1] <= 78 && cmd[2] == 0)
-      {
-        break;
-      } else {
-        printf("コマンドエラー!もう一度入力してください\n");
-      }
-    }
-    evaluateGems(field, cmd[0], cmd[1]);
+    if (field.BaniInfo->combo == 0){
+      printf("[%sのターン]\n\n", playerName);
+      showBattleField(mAddr, HP, EneHP, EneMaxHP, field);
 
-    int attack = doAttack(playerName, mAddr, HP);
+      while(true){
+        printf("コマンド?>\n");
+        scanf("%s", cmd);
+        if (cmd[0] != cmd[1] && cmd[0] >= 65 && cmd[0] <= 78 && cmd[1] >= 65 && cmd[1] <= 78 && cmd[2] == 0)
+        {
+          break;
+        } else {
+          printf("コマンドエラー!もう一度入力してください\n");
+        }
+      }
+    } else { //ダミーで代入しておく
+      cmd[0] = 65;
+      cmd[1] = 66;
+    }
+
+    evaluateGems(field, cmd[0], cmd[1], field.BaniInfo->combo);
+    int element = field.BaniInfo->element;
+    int length = field.BaniInfo->length;
+    int gemCNT = length + 1;
+    int attack;
+    if (element <= 3 && length >= 2) {
+      attack = doAttack(field, mAddr);
+    } else {
+      attack = 0;
+    }
+    if (element == 4 && length >= 2) {
+      attack = doRecover(gemCNT, field);
+    }
     return attack;
 }
 
-// 敵の攻撃を管理する関数
-int doEnemyAttack(Monster* mAddr, int HP)
+// 敵の攻撃によるダメージを算出する関数
+double calcEnemyAttackDamage(BattleField field, Monster* mAddr)
 {
-  int attack = 20;
-  printf("%dのダメージを受けた\n\n", attack);
-  return attack;
+  double pDefense;
+  double pDefenseSum = 0;
+  for (int i = 0; i < field.partyCnt; i++) {
+    pDefenseSum += (field.partyAddr+i)->defense;
+  }
+  pDefense = pDefenseSum / field.partyCnt;
+  int eAttack = mAddr->attack;
+  double preAttack = (eAttack - pDefense);
+  return preAttack;
+}
+// 敵の攻撃を管理する関数
+int doEnemyAttack(Monster* mAddr, int HP, BattleField field)
+{
+  double preAttack = calcEnemyAttackDamage(field, mAddr);
+  double attack = blurDamage(preAttack);
+  if (attack <= 0) {
+    attack = 1;
+  }
+  printf("%gのダメージを受けた\n\n", floor(attack));
+  return floor(attack);
 }
 
 // 敵のターンを管理する関数
-int onEnemyTurn(Monster* mAddr, int HP)
+int onEnemyTurn(Monster* mAddr, int HP, BattleField field)
 {
     printf("[%sのターン]\n\n", mAddr->name);
-    int attack = doEnemyAttack(mAddr, HP);
+    calcEnemyAttackDamage(field, mAddr);
+    int attack = doEnemyAttack(mAddr, HP, field);
     return attack;
 }
 
@@ -137,17 +248,40 @@ int doBattle(char* playerName, Monster* mAddr, int HP, BattleField field)
 
   int EneHP = mAddr->hp;
   int EneMaxHP = mAddr->hp;
+  int MaxHP = 0;
+  for (int i = 0; i < field.partyCnt; i++) {
+    MaxHP += (field.partyAddr+i)->hpMax;
+  }
+
+  // int element = 5;
+  // int start = 0;
+  // int length = 0;
+  // int combo = 0;
+  // BanishInfo initialInfo = {element, start, length, combo};
+  // memcpy(field.BaniInfo, &initialInfo, 30);
 
   while (true) {
-    int Edamage = onPlayerTurn(playerName, mAddr, HP, EneHP, EneMaxHP, field);
-    EneHP -= Edamage;
+    while (field.BaniInfo->combo >= 0) {
+      int Edamage = onPlayerTurn(playerName, mAddr, HP, EneHP, EneMaxHP, field);
+      if (Edamage < 0) {
+        HP -= Edamage;
+        if (HP >= MaxHP) {
+          HP = MaxHP;
+        }
+      } else {
+        EneHP -= Edamage;
+        }
+      if (field.BaniInfo->combo == 0) {
+        break;
+      }
+    }
     if (EneHP <= 0) {
       printMonsterName(mAddr);
       printf("を倒した\n\n");
       break;
     }
 
-    int Pdamage = onEnemyTurn(mAddr, HP);
+    int Pdamage = onEnemyTurn(mAddr, HP, field);
     HP -= Pdamage;
     if (HP <= 0) {
       break;
@@ -277,9 +411,7 @@ void swapGem(BattleField field, int before1, int before_ind, int after_ind)
     preGems[before1-1] = before_val;
     preGems[before1] = move_val;
   }
-  // for (int i = 0; i < MAX_GEMS; i++) {
-  //   printf("%d ", preGems[i]);
-  // }
+
   memcpy(field.slot, &preGems[0], 100);
   printGems(MAX_GEMS, field);
 }
@@ -360,12 +492,13 @@ void banishGems(BattleField field)
 }
 
 // 宝石の並びを調べて消去可能な箇所があることを判断する関数
-bool checkBanishable(BattleField field)
+bool checkBanishable(BattleField field, int comboNum)
 {
   int preGems[MAX_GEMS];
   int element = 0;
   int start = 0;
   int length = 0;
+  int combo = comboNum+1;
 
   for (int i = 0; i < MAX_GEMS; i++) {
     preGems[i] = *(field.slot+i);
@@ -385,16 +518,23 @@ bool checkBanishable(BattleField field)
       break;
     }
   }
-  BanishInfo Info = {element, start, length};
-  memcpy(field.BaniInfo, &Info, 12);
+  // BanishInfo Info = {element, start, length, combo};
+  // printf("combo %d\n", combo);
+  // memcpy(field.BaniInfo, &Info, 30);
+  // printf("combo %d\n", field.BaniInfo->combo);
   if (length >= 2) {
+    BanishInfo Info = {element, start, length, combo};
+    memcpy(field.BaniInfo, &Info, 30);
     return true;
   }
+  combo = -1;
+  BanishInfo Info = {element, start, length, combo};
+  memcpy(field.BaniInfo, &Info, 30);
   return false;
 }
 
 // 宝石を移動して配列の並びを変更する関数
-void evaluateGems(BattleField field, char before, char after)
+void evaluateGems(BattleField field, char before, char after, int combo)
 {
   int preGems[MAX_GEMS];
   int before_ind = before - 65;
@@ -403,13 +543,23 @@ void evaluateGems(BattleField field, char before, char after)
     preGems[i] = *(field.slot+i);
   }
 
-  moveGem(field, before_ind, after_ind);
-  bool banish = checkBanishable(field);
+  if (combo == 0) {
+    moveGem(field, before_ind, after_ind);
+  }
+  bool banish = checkBanishable(field, field.BaniInfo->combo);
   if (banish) {
     banishGems(field);
     shiftGems(field);
     spawnGems(field);
-    }
+  }
+  else {
+    int element = 5;
+    int start = 0;
+    int length = 0;
+    int combo = 0;
+    BanishInfo BackInfo = {element, start, length, combo};
+    memcpy(field.BaniInfo, &BackInfo, 30);
+  }
 }
 
 int main(int argc, char** argv)
@@ -429,7 +579,7 @@ int main(int argc, char** argv)
       gems[i] = fillGems();
     }
 
-    BanishInfo BaniInfo = {5, 0, 0};
+    BanishInfo BaniInfo = {5, 0, 0, 0};
 
     // バトルフィールドの構造体をここで定義(パーティ編成が可変の可能性があるので)
     BattleField field = {partyList[0], sizeof(partyList) / sizeof(partyList[0]),
