@@ -1,0 +1,1 @@
+int createRand(int max);
